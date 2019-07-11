@@ -18,13 +18,11 @@ for i in range(len(df)):
     except:
         df = df.drop(df.index[i], axis= 0)
 
-df['pickup_date'] = df['pickup_datetime'].dt.date
 df['pickup_day'] = df['pickup_datetime'].apply(lambda x: x.day)
 df['pickup_hour'] = df['pickup_datetime'].apply(lambda x: x.hour)
 df['pickup_day_of_week'] = df['pickup_datetime'].apply(lambda x: calendar.day_name[x.weekday()])
 df['pickup_month'] = df['pickup_datetime'].apply(lambda x: x.month)
 df['pickup_year'] = df['pickup_datetime'].apply(lambda x: x.year)
-
 df['pickup_latitude_round3']=df['pickup_latitude'].apply(lambda x:round(x,3)).astype(float)
 df['pickup_longitude_round3']=df['pickup_longitude'].apply(lambda x:round(x,3)).astype(float)
 df['dropoff_latitude_round3']=df['dropoff_latitude'].apply(lambda x:round(x,3)).astype(float)
@@ -57,24 +55,29 @@ from sklearn.preprocessing import Imputer
 imputer = Imputer(missing_values='NaN', strategy='mean', axis=0)
 imputer = imputer.fit(df[["fare_amount"]])
 df[["fare_amount"]] = imputer.transform(df[["fare_amount"]])
+from sklearn.preprocessing import LabelEncoder
+encoder = LabelEncoder()
+encoder.fit(df['pickup_day_of_week'].drop_duplicates())
+df['pickup_day_of_week'] = encoder.transform(df['pickup_day_of_week'])
 #imputer1 = Imputer(missing_values='NaN', strategy='mode', axis=0)
 #imputer = imputer.fit(df[["passenger_count"]])
 #df[["passenger_count"]] = imputer.transform(df[["passenger_count"]]).astype(int)
 
-pickup_fare_amount=df.groupby(['pickup_latitude_round3','pickup_longitude_round3'])['fare_amount'].mean().reset_index().rename(columns={'fare_amount':'avg_fare'})
+#pickup_fare_amount=df.groupby(['pickup_latitude_round3','pickup_longitude_round3'])['fare_amount'].mean().reset_index().rename(columns={'fare_amount':'avg_fare'})
 X = df[["fare_amount"]]
 from sklearn.model_selection import train_test_split
 
-colsToDrop = df[['fare_amount']]
-X = df.drop(colsToDrop, axis=1)
+#colsToDrop = df[['fare_amount']]
+#X = df.drop(colsToDrop, axis=1)
+X = df.iloc[:,1:17]
 y = df[["fare_amount"]]
 
 df_train, df_test,y_train,y_test = train_test_split(X,y, test_size=0.33, random_state=42)
-X = df_train[["pickup_year", "Distance"]]
+X = df_train[["Distance", "passenger_count","pickup_year","pickup_month","pickup_day"]]
 from sklearn.linear_model import LinearRegression
 reg = LinearRegression()
 reg.fit(X, y_train)
-X_test = df_test[["pickup_year", "Distance"]]
+X_test = df_test[["Distance","passenger_count","pickup_year","pickup_month","pickup_day"]]
 y_pred = reg.predict(X_test)
 
 from sklearn.metrics import mean_squared_error
@@ -95,4 +98,37 @@ score = mean_squared_error(y_test, y_dec_pred)
 print("DECISSION rmse" , score)
 from sklearn.metrics import mean_absolute_error
 score1 = mean_absolute_error(y_test, y_dec_pred)
-print("DECSION mpae" , score1)
+print("MAPE " , score1)
+
+'''
+#colsToDrop = df_train[['pickup_datetime']]
+Xl = df_train.iloc[:,1:16]
+yl = y_train
+import statsmodels.formula.api as sm
+
+#X_opt =  X
+regressor_OLS = sm.OLS (endog = yl, exog = Xl).fit()
+print(regressor_OLS.summary())
+
+
+def backwardElimination(x, sl):
+    numVars = len(x[0])
+    for i in range(0, numVars):
+        regressor_OLS = sm.OLS(yl, x).fit()
+        maxVar = max(regressor_OLS.pvalues)
+
+        if maxVar > sl:
+            for j in range(0, numVars - i):
+                if (regressor_OLS.pvalues[j].astype(float) == maxVar):
+                    x = np.delete(x, j, 1)
+    print(regressor_OLS.summary())
+
+    return x
+
+
+SL = 0.05
+X_opt = Xl
+X_modeled = backwardElimination(X_opt.values, SL)
+print(X_modeled)
+
+'''
