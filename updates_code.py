@@ -2,17 +2,21 @@ import calendar
 import pandas as pd
 import numpy as np
 np.set_printoptions(precision=3)
+#pd.set_option('display.float_format', lambda x: '%.3f' % x)
 import matplotlib.pyplot as plt
 df = pd.read_csv("train_cab.csv")
-
-
-df.head()
+#df.head()
 df['pickup_datetime']=pd.to_datetime(df['pickup_datetime'],format='%Y-%m-%d %H:%M:%S UTC',errors='coerce' )
+df["fare_amount"] = pd.to_numeric(df["fare_amount"], errors='coerce')
+
+#df.pickup_datetime = df.pickup_datetime.drop
+#df = df[((df['pickup_longitude'] > -78) & (df['pickup_longitude'] < -70)) & ((df['dropoff_longitude'] > -78) & (df['dropoff_longitude'] < -70)) & ((df['pickup_latitude'] > 37) & (df['pickup_latitude'] < 45))
+#        & ((df['dropoff_latitude'] > 37) & (df['dropoff_latitude'] < 45))]
 
 df = df[df["pickup_datetime"] < df["pickup_datetime"].max()]
 df = df[df["pickup_datetime"] > df["pickup_datetime"].min()]
 df.reset_index(inplace=True)
-df["fare_amount"] = pd.to_numeric(df["fare_amount"], errors='coerce')
+df = df.drop(['index'], axis= 1)
 
 df['pickup_day'] = df['pickup_datetime'].apply(lambda x: x.day)
 df['pickup_hour'] = df['pickup_datetime'].apply(lambda x: x.hour)
@@ -34,20 +38,28 @@ for i in range(len(df)):
     X.append(d)
 print(X[0:10])
 
-df["Distance"] = X
+df["Distance_km"] = X
 
 len(df.loc[df["passenger_count"] > 8])
-df = df[df["Distance"] < 50]
-df = df[df["Distance"] >= 1 ]
+df = df[df["Distance_km"] < 50]
+df = df[df["Distance_km"] > 0 ]
 df = df[df["passenger_count"] >= 1]
 df = df[df["passenger_count"] <= 8]
 df = df.loc[df["fare_amount"] >= 1]
-df = df.loc[df["fare_amount"] < 5000]
+df = df.loc[df["fare_amount"] < 200]
 
-from sklearn.preprocessing import Imputer
-imputer = Imputer(missing_values='NaN', strategy='mean', axis=0)
-imputer = imputer.fit(df[["fare_amount"]])
-df[["fare_amount"]] = imputer.transform(df[["fare_amount"]])
+print(df.describe())
+
+
+
+#from sklearn.preprocessing import Imputer
+#imputer = Imputer(missing_values='NaN', strategy='mean', axis=0)
+#imputer = imputer.fit(df[["fare_amount"]])
+#df[["fare_amount"]] = imputer.transform(df[["fare_amount"]])
+
+#imputer1 = Imputer(missing_values='NaN', strategy='most_frequent', axis=0)
+#imputer = imputer1.fit(df[["passenger_count"]])
+#df[["passenger_count"]] = imputer1.transform(df[["passenger_count"]])
 
 from sklearn.preprocessing import LabelEncoder
 encoder = LabelEncoder()
@@ -56,8 +68,8 @@ df['pickup_day_of_week'] = encoder.transform(df['pickup_day_of_week'])
 #encoder.fit(df['pickup_year'].drop_duplicates())
 #df['pickup_year'] = encoder.transform(df['pickup_year'])
 
-df_corr = df.drop(["pickup_datetime",'index'], axis= 1)
-#defining co-relation
+df_corr = df.drop(["pickup_datetime"], axis= 1)
+
 corr = df_corr.corr()
 
 columns = np.full((corr.shape[0],), True, dtype=bool)
@@ -72,7 +84,7 @@ data = df_corr[selected_columns]
 selected_columns = selected_columns[1:].values
 
 import statsmodels.formula.api as sm
-x = (df_corr.iloc[:, 1:])
+x = (df_corr.iloc[:,5:])
 Y = (df_corr.iloc[:, 0])
 def backwardElimination(x, sl):
     numVars = len(x[0])
@@ -91,12 +103,20 @@ SL = 0.05
 data_modeled = backwardElimination(x.values, SL )
 
 from sklearn.model_selection import train_test_split
-X = df_corr.iloc[:,-2:]
+
+#colsToDrop = df[['fare_amount']]
+#X = df.drop(colsToDrop, axis=1)
+#new = df_corr.drop(["pickup_latitude","dropoff_latitude","passenger_count","pickup_month","pickup_day_of_week"], axis = 1)
+X = df_corr.iloc[:,9:]
 y = df_corr[["fare_amount"]]
-df_train, df_test,y_train,y_test = train_test_split(X,y, test_size=0.33, random_state=42)
+#X =X.to_frame()
+#y = y.to_frame()
+df_train, df_test,y_train,y_test = train_test_split(X,y, test_size=0.2, random_state=42)
+#X_pass = df_train.values
 from sklearn.linear_model import LinearRegression
 reg = LinearRegression()
 reg.fit(df_train, y_train)
+#X_test = df_test[[""]]
 y_pred = reg.predict(df_test)
 
 from sklearn.metrics import mean_squared_error
@@ -109,7 +129,7 @@ print(score1)
 #from sklearn.ensemble import RandomForestRegressor
 from sklearn.svm import LinearSVR
 rf = LinearSVR(random_state=0, tol=1e-5)
-#rf = RandomForestRegressor(max_depth=2, random_state=0, n_estimators=100)
+#rf = RandomForestRegressor(max_depth=10, random_state=0, n_estimators=200)
 rf.fit(df_train, y_train)
 
 y_dec_pred = rf.predict(df_test)
@@ -121,10 +141,10 @@ from sklearn.metrics import mean_absolute_error
 score1 = mean_absolute_error(y_test, y_dec_pred)
 print("MAPE " , score1)
 
-plt.plot(y_test, 'o-', color="r")
-plt.plot(y_dec_pred, 'o-', color="b")
-plt.plot(y_pred, 'o-', color="g")
-plt.show()
+#plt.plot(y_test, 'o-', color="r")
+#plt.plot(y_dec_pred, 'o-', color="b")
+#plt.plot(y_pred, 'o-', color="g")
+#plt.show()
 
 
 
